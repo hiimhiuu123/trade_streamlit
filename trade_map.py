@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 def extract_plant_type(name):
     name_lower = name.lower()
@@ -17,7 +18,7 @@ def main():
     st.set_page_config(page_title="Thống kê nhà máy điện", layout="wide")
     st.title("📊 Thống kê Nhà máy điện từ File CSV")
 
-    file_path = 'C:/Users/Dell/input.csv'
+    file_path = os.path.join(os.path.dirname(__file__), 'input.csv')
 
     try:
         df = pd.read_csv(file_path, sep='\t')
