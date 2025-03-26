@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Map4D Render</title>
+  <style>#map { width: 100%; height: 100%; }</style>
+</head>
+<body>
+  <div id="map" style="width:100%; height:800px;"></div>
+
+  <script>
+    function initMap() {
+      let map = new map4d.Map(document.getElementById("map"), {
+        center: { lat: 16.072163, lng: 108.226905 },
+        zoom: 6
+      });
+
+      // ##MARKERS_PLACEHOLDER##
+    }
+
+    window.onload = initMap;
+  </script>
+  <script src="https://api.map4d.vn/sdk/map/js?version=2.6&key=__API_KEY__&mapId=__MAP_ID__"></script>
+</body>
+</html>
