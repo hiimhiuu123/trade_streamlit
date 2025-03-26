@@ -60,13 +60,13 @@ def render_map4d(df, api_key, map_id=""):
 
 def main():
     st.set_page_config(page_title="Thống kê nhà máy điện", layout="wide")
-    st.title("📊 Thống kê Nhà máy điện từ File CSV")
+    st.title("📊 Thống kê Nhà máy điện tái tạo")
 
     file_path = os.path.join(os.path.dirname(__file__), 'input.csv')
 
     try:
         df = pd.read_csv(file_path, sep='\t')
-        st.success(f"✅ Đọc thành công dữ liệu từ: `{file_path}`")
+        st.success("")
     except Exception as e:
         st.error(f"❌ Lỗi khi đọc file CSV: {e}")
         return
