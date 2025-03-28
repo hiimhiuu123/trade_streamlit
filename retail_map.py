@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 # Tải các biến môi trường từ file .env (cho phát triển cục bộ; khi deploy, cấu hình trực tiếp trên nền tảng)
 load_dotenv()
-MAP4D_API_KEY = os.getenv("MAP4D_API_KEY")
-MAP4D_MAP_ID = os.getenv("MAP4D_MAP_ID", "")
+MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY")
+MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID", "")
 
 def render_map4d(df, api_key, map_id=""):
     """
