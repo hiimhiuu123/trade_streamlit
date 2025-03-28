@@ -52,7 +52,7 @@ def main():
     file_path = os.path.join(os.path.dirname(__file__), 'input.csv')
     try:
         df = pd.read_csv(file_path, sep='\t')
-        st.success("Đọc file CSV thành công!")
+        st.success("")
     except Exception as e:
         st.error(f"❌ Lỗi khi đọc file CSV: {e}")
         return
