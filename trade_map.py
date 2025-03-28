@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 # Nếu cần sử dụng biến môi trường (cho MAP4D API Key)
 load_dotenv()
-MAP4D_API_KEY = os.getenv("MAP4D_API_KEY")
-MAP4D_MAP_ID = os.getenv("MAP4D_MAP_ID", "")
+MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY")
+MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID", "")
 
 def extract_plant_type(name):
     name_lower = name.lower()
