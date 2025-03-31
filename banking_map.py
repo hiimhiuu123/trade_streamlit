@@ -42,7 +42,7 @@ def main():
     
     st.title("🏦 Bản đồ Cơ sở Ngân hàng")
     
-    file_path = os.path.join(os.path.dirname(__file__), "baking_data.csv")
+    file_path = os.path.join(os.path.dirname(__file__), "banking_data.csv")
     try:
         df = pd.read_csv(file_path)
     except Exception as e:
