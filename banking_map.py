@@ -74,7 +74,7 @@ def main():
         filtered_df = filtered_df[filtered_df['bank'] == selected_bank]
     
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
-    st.dataframe(filtered_df[['id', 'bank', 'bank_name', 'name', 'city', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['id', 'bank', 'name','address' ,'city', 'latitude', 'longitude']])
     
     # Tạo DataFrame cho bản đồ: không loại bỏ các dòng trong bảng, nhưng chỉ lấy các dòng có tọa độ hợp lệ để hiển thị bản đồ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
