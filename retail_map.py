@@ -91,6 +91,11 @@ def main():
             missing_by_city = missing_coords.groupby('city').size().reset_index(name='missing_count')
             st.write("Số dòng thiếu tọa độ theo thành phố:")
             st.dataframe(missing_by_city)
+            
+            
+            missing_by_bank = missing_coords.groupby('retail_chain').size().reset_index(name='missing_count')
+            st.write("Số dòng thiếu tọa độ theo chuỗi bán lẻ:")
+            st.dataframe(missing_by_bank)
 
     # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
