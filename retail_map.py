@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 # Tải các biến môi trường từ file .env (cho phát triển cục bộ; khi deploy, cấu hình trực tiếp trên nền tảng)
 load_dotenv()
-MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY")
-MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID", "")
+MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
+MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID") or os.getenv("MAP4D_MAP_ID", "")
 
 def render_map4d(df, api_key, map_id=""):
     """
@@ -38,7 +38,7 @@ def render_map4d(df, api_key, map_id=""):
     st.components.v1.html(html_content, height=800)
 
 def main():
-    # Nếu file được chạy trực tiếp, cấu hình trang; khi được import thì không gọi.
+    # Nếu file được chạy độc lập, cấu hình trang; khi được import thì không gọi.
     if __name__ == "__main__":
         st.set_page_config(page_title="Bản đồ Cơ sở bán lẻ", layout="wide")
     
@@ -62,7 +62,7 @@ def main():
     st.write("### Dữ liệu gốc:")
     st.dataframe(df.head(10))
 
-    # Tạo các bộ lọc: theo city và retail_chain
+    # Bộ lọc theo city và retail_chain
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     retail_options = ['Tất cả'] + sorted(df['retail_chain'].dropna().unique().tolist())
     
@@ -75,14 +75,26 @@ def main():
     if selected_retail != "Tất cả":
         filtered_df = filtered_df[filtered_df['retail_chain'] == selected_retail]
     
-    st.write("### Dữ liệu đã lọc (số dòng:", filtered_df.shape[0], "):")
-    st.dataframe(filtered_df[['id', 'retail_chain', 'name','address' ,'city', 'latitude', 'longitude']])
+    st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
+    st.dataframe(filtered_df[['id', 'retail_chain', 'name', 'address', 'city', 'latitude', 'longitude']])
     
-    # Lưu ý: Không loại bỏ các dòng có giá trị NaN để hiển thị bảng dữ liệu, 
-    # nhưng khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ.
+    # Phân tích dữ liệu tọa độ (không loại bỏ dòng có NaN để hiển thị bảng)
+    with st.expander("Xem phân tích dữ liệu tọa độ"):
+        total_rows = filtered_df.shape[0]
+        missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
+        missing_count = missing_coords.shape[0]
+        valid_count = total_rows - missing_count
+        st.write(f"Tổng số dòng sau lọc: {total_rows}")
+        st.write(f"Số dòng có tọa độ hợp lệ: {valid_count}")
+        st.write(f"Số dòng thiếu tọa độ: {missing_count} ({(missing_count/total_rows*100):.2f}%)")
+        if 'city' in filtered_df.columns:
+            missing_by_city = missing_coords.groupby('city').size().reset_index(name='missing_count')
+            st.write("Số dòng thiếu tọa độ theo thành phố:")
+            st.dataframe(missing_by_city)
+
+    # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
     
-    # Nút toggle hiển thị/ẩn bản đồ
     if "map_visible_retail" not in st.session_state:
         st.session_state.map_visible_retail = False
     if st.button("Hiển thị/Ẩn bản đồ Cơ sở bán lẻ", key="toggle_map_retail"):
@@ -90,7 +102,7 @@ def main():
 
     if st.session_state.map_visible_retail:
         if not MAP4D_API_KEY:
-            st.warning("⚠️ Vui lòng cấu hình MAP4D_API_KEY trong file .env")
+            st.warning("⚠️ Vui lòng cấu hình MAP4D_API_KEY trong phần Secrets của Streamlit")
         else:
             render_map4d(map_df, api_key=MAP4D_API_KEY, map_id=MAP4D_MAP_ID)
 
