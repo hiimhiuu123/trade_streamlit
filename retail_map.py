@@ -76,7 +76,7 @@ def main():
         filtered_df = filtered_df[filtered_df['retail_chain'] == selected_retail]
     
     st.write("### Dữ liệu đã lọc (số dòng:", filtered_df.shape[0], "):")
-    st.dataframe(filtered_df[['id', 'retail_chain', 'name', 'city', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['id', 'retail_chain', 'name','address' ,'city', 'latitude', 'longitude']])
     
     # Lưu ý: Không loại bỏ các dòng có giá trị NaN để hiển thị bảng dữ liệu, 
     # nhưng khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ.
