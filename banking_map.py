@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Nếu đang chạy trên Streamlit Cloud, hãy sử dụng st.secrets; nếu không, có thể dùng os.getenv()
+# Sử dụng st.secrets nếu deploy trên Streamlit Cloud; nếu không, sử dụng os.getenv()
 MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
 MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID") or os.getenv("MAP4D_MAP_ID", "")
 
@@ -60,7 +60,7 @@ def main():
     st.write("### Dữ liệu gốc:")
     st.dataframe(df.head(10))
 
-    # Tạo các bộ lọc: theo city và bank
+    # Bộ lọc theo city và bank
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     bank_options = ['Tất cả'] + sorted(df['bank'].dropna().unique().tolist())
     
@@ -74,9 +74,30 @@ def main():
         filtered_df = filtered_df[filtered_df['bank'] == selected_bank]
     
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
-    st.dataframe(filtered_df[['id', 'bank', 'name','address' ,'city', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['id', 'bank', 'bank_name', 'name', 'city', 'latitude', 'longitude']])
     
-    # Tạo DataFrame cho bản đồ: không loại bỏ các dòng trong bảng, nhưng chỉ lấy các dòng có tọa độ hợp lệ để hiển thị bản đồ
+    # Phân tích dữ liệu tọa độ
+    with st.expander("Phân tích dữ liệu tọa độ"):
+        total_rows = filtered_df.shape[0]
+        # Xác định các dòng có tọa độ không hợp lệ (NaN)
+        missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
+        missing_count = missing_coords.shape[0]
+        valid_count = total_rows - missing_count
+        st.write(f"Tổng số dòng sau lọc: {total_rows}")
+        st.write(f"Số dòng có tọa độ hợp lệ: {valid_count}")
+        st.write(f"Số dòng thiếu tọa độ: {missing_count} ({(missing_count/total_rows*100):.2f}%)")
+        
+        # Phân tích theo thành phố
+        missing_by_city = missing_coords.groupby('city').size().reset_index(name='missing_count')
+        st.write("Số dòng thiếu tọa độ theo thành phố:")
+        st.dataframe(missing_by_city)
+        
+        # Phân tích theo ngân hàng
+        missing_by_bank = missing_coords.groupby('bank').size().reset_index(name='missing_count')
+        st.write("Số dòng thiếu tọa độ theo ngân hàng:")
+        st.dataframe(missing_by_bank)
+    
+    # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
     
     if "map_visible_bank" not in st.session_state:
