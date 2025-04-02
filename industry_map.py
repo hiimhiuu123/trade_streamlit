@@ -3,6 +3,10 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 
+# Cấu hình trang ngay từ đầu nếu chạy file độc lập
+if __name__ == "__main__":
+    st.set_page_config(page_title="Bản đồ Khu công nghiệp", layout="wide")
+
 # Tải các biến môi trường từ file .env (cho phát triển cục bộ; khi deploy, cấu hình trực tiếp trên nền tảng)
 load_dotenv()
 MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
@@ -46,8 +50,6 @@ def render_map4d(df, api_key, map_id=""):
     st.components.v1.html(html_content, height=800)
 
 def main():
-    if __name__ == "__main__":
-        st.set_page_config(page_title="Bản đồ Khu công nghiệp", layout="wide")
     st.title("🏭 Bản đồ Khu công nghiệp")
 
     # Đọc file CSV chứa dữ liệu KCN
@@ -61,12 +63,12 @@ def main():
     st.write("### Dữ liệu gốc:")
     st.dataframe(df.head(10))
 
-    # Bộ lọc theo city và investor (nếu muốn)
+    # Bộ lọc theo city và investor
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     investor_options = ['Tất cả'] + sorted(df['investor'].dropna().unique().tolist())
 
-    selected_city = st.selectbox("Chọn thành phố:", options=city_options, key="city_filter")
-    selected_investor = st.selectbox("Chọn investor:", options=investor_options, key="investor_filter")
+    selected_city = st.selectbox("Chọn thành phố:", options=city_options, key="industry_city_filter")
+    selected_investor = st.selectbox("Chọn investor:", options=investor_options, key="industry_investor_filter")
 
     filtered_df = df.copy()
     if selected_city != "Tất cả":
@@ -75,7 +77,29 @@ def main():
         filtered_df = filtered_df[filtered_df['investor'] == selected_investor]
 
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
-    st.dataframe(filtered_df[['id', 'name', 'address', 'city', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['id', 'name', 'investor', 'address', 'city', 'latitude', 'longitude']])
+
+    # Phân tích dữ liệu tọa độ
+    with st.expander("Xem phân tích dữ liệu tọa độ"):
+        total_rows = filtered_df.shape[0]
+        missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
+        missing_count = missing_coords.shape[0]
+        valid_count = total_rows - missing_count
+        st.write(f"Tổng số KCN sau lọc: {total_rows}")
+        st.write(f"Số KCN có tọa độ hợp lệ: {valid_count}")
+        st.write(f"Số KCN thiếu tọa độ: {missing_count} ({(missing_count/total_rows*100):.2f}%)")
+
+        # Thống kê theo thành phố
+        if 'city' in filtered_df.columns:
+            missing_by_city = missing_coords.groupby('city').size().reset_index(name='Số lượng thiếu tọa độ')
+            st.write("Số KCN thiếu tọa độ theo thành phố:")
+            st.dataframe(missing_by_city)
+
+        # Thống kê theo investor
+        if 'investor' in filtered_df.columns:
+            missing_by_investor = missing_coords.groupby('investor').size().reset_index(name='Số lượng thiếu tọa độ')
+            st.write("Số KCN thiếu tọa độ theo investor:")
+            st.dataframe(missing_by_investor)
 
     # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
