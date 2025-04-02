@@ -46,7 +46,8 @@ def render_map4d(df, api_key, map_id=""):
     st.components.v1.html(html_content, height=800)
 
 def main():
-    st.set_page_config(page_title="Bản đồ Khu công nghiệp", layout="wide")
+    if __name__ == "__main__":
+        st.set_page_config(page_title="Bản đồ Khu công nghiệp", layout="wide")
     st.title("🏭 Bản đồ Khu công nghiệp")
 
     # Đọc file CSV chứa dữ liệu KCN
