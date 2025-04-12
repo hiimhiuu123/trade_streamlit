@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import os
 from dotenv import load_dotenv
 
-# Tải các biến môi trường từ file .env (cho phát triển cục bộ; khi deploy, cấu hình trực tiếp trên nền tảng)
 load_dotenv()
+# MAP4D_API_KEY = os.getenv("MAP4D_API_KEY")
+# MAP4D_MAP_ID = os.getenv("MAP4D_MAP_ID", "")
+
 MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
 MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID") or os.getenv("MAP4D_MAP_ID", "")
 
 def render_map4d(df, api_key, map_id=""):
-    """
-    Hiển thị bản đồ Map4D sử dụng template map4d_template.html.
-    Template cần chứa các placeholder: ##MARKERS_PLACEHOLDER##, __API_KEY__, __MAP_ID__.
-    """
     template_path = os.path.join(os.path.dirname(__file__), "map4d_template.html")
     if not os.path.exists(template_path):
         st.error("❌ Không tìm thấy file map4d_template.html!")
@@ -32,13 +31,12 @@ def render_map4d(df, api_key, map_id=""):
     html_content = (
         html_template
         .replace("##MARKERS_PLACEHOLDER##", marker_js)
-        .replace("__API_KEY__", api_key)
-        .replace("__MAP_ID__", map_id or "")
+        .replace("__API_KEY__", MAP4D_API_KEY)
+        .replace("__MAP_ID__", MAP4D_MAP_ID or "")
     )
     st.components.v1.html(html_content, height=800)
 
 def main():
-    # Nếu file được chạy độc lập, cấu hình trang; khi được import thì không gọi.
     if __name__ == "__main__":
         st.set_page_config(page_title="Bản đồ Cơ sở bán lẻ", layout="wide")
     
@@ -51,23 +49,15 @@ def main():
         st.error(f"❌ Lỗi khi đọc file CSV: {e}")
         return
 
-    # Xử lý: Nếu cột 'name' bị trống, thay thế bằng retail_chain + address
-    df['name'] = df.apply(
-        lambda row: f"{row['retail_chain']} {row['address']}" 
-                    if (pd.isna(row['name']) or str(row['name']).strip() == "") 
-                    else row['name'],
-        axis=1
-    )
-
     st.write("### Dữ liệu gốc:")
     st.dataframe(df.head(10))
 
-    # Bộ lọc theo city và retail_chain
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     retail_options = ['Tất cả'] + sorted(df['retail_chain'].dropna().unique().tolist())
     
-    selected_city = st.selectbox("Chọn thành phố:", options=city_options, key="retail_city_filter")
-    selected_retail = st.selectbox("Chọn retail_chain:", options=retail_options, key="retail_filter_retail")
+    st.sidebar.header("Bộ lọc Bán lẻ")
+    selected_city = st.sidebar.selectbox("Chọn thành phố:", options=city_options, key="retail_city_filter")
+    selected_retail = st.sidebar.selectbox("Chọn retail_chain:", options=retail_options, key="retail_filter_retail")
     
     filtered_df = df.copy()
     if selected_city != "Tất cả":
@@ -76,9 +66,8 @@ def main():
         filtered_df = filtered_df[filtered_df['retail_chain'] == selected_retail]
     
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
-    st.dataframe(filtered_df[['id', 'retail_chain', 'name', 'address', 'city', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['id', 'retail_chain', 'name','type', 'address', 'city', 'latitude', 'longitude']])
     
-    # Phân tích dữ liệu tọa độ (không loại bỏ dòng có NaN để hiển thị bảng)
     with st.expander("Xem phân tích dữ liệu tọa độ"):
         total_rows = filtered_df.shape[0]
         missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
@@ -91,18 +80,43 @@ def main():
             missing_by_city = missing_coords.groupby('city').size().reset_index(name='missing_count')
             st.write("Số dòng thiếu tọa độ theo thành phố:")
             st.dataframe(missing_by_city)
-            
-            
-            missing_by_bank = missing_coords.groupby('retail_chain').size().reset_index(name='missing_count')
-            st.write("Số dòng thiếu tọa độ theo chuỗi bán lẻ:")
-            st.dataframe(missing_by_bank)
+        missing_by_bank = missing_coords.groupby('retail_chain').size().reset_index(name='missing_count')
+        st.write("Số dòng thiếu tọa độ theo chuỗi bán lẻ:")
+        st.dataframe(missing_by_bank)
 
-    # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
+    st.sidebar.markdown("### Tuỳ chọn biểu đồ")
+    width = st.sidebar.slider("Chọn chiều rộng biểu đồ:", min_value=400, max_value=1200, value=800)
+    height = st.sidebar.slider("Chọn chiều cao biểu đồ:", min_value=300, max_value=800, value=400)
+    chart_option = st.sidebar.selectbox("Chọn biểu đồ:", options=["Cột chồng", "Tròn"], key="chart_option")
+    if chart_option == "Cột chồng":
+        st.markdown("### 📈 Biểu đồ cột chồng: Số lượng cửa hàng bán lẻ theo tên chuỗi và loại hình")
+        type_subtype_counts = filtered_df.groupby(['retail_chain', 'type']).size().reset_index(name='count')
+        fig1 = px.bar(
+            type_subtype_counts, 
+            x='retail_chain', 
+            y='count', 
+            color='type',
+            labels={'retail_chain': 'Chuỗi bán lẻ', 'count': 'Số lượng', 'type': 'Loại hình'},
+            title="Số lượng cửa hàng bán lẻ theo tên chuỗi và loại hình",
+            barmode='stack'
+        )
+        fig1.update_layout(width=width, height=height, xaxis_title="Chuỗi bán lẻ", yaxis_title="Số lượng")
+        st.plotly_chart(fig1)
+    elif chart_option == "Tròn":
+        st.markdown("### 🥧 Biểu đồ tròn: Tỉ lệ địa điểm giao dịch theo ngân hàng")
+        type_counts = df['bank'].value_counts()
+        fig2 = px.pie(
+            names=type_counts.index, 
+            values=type_counts.values, 
+            title="Tỉ lệ phần trăm ngân hàng"
+        )
+        fig2.update_layout(width=width, height=height)
+        st.plotly_chart(fig2)
     
     if "map_visible_retail" not in st.session_state:
         st.session_state.map_visible_retail = False
-    if st.button("Hiển thị/Ẩn bản đồ Cơ sở bán lẻ", key="toggle_map_retail"):
+    if st.sidebar.button("Hiển thị/Ẩn bản đồ Bán lẻ", key="toggle_map_retail"):
         st.session_state.map_visible_retail = not st.session_state.map_visible_retail
 
     if st.session_state.map_visible_retail:

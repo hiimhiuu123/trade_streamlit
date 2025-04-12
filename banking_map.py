@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import os
 
-# Sử dụng st.secrets nếu deploy trên Streamlit Cloud; nếu không, sử dụng os.getenv()
+# MAP4D_API_KEY = os.getenv("MAP4D_API_KEY")
+# MAP4D_MAP_ID = os.getenv("MAP4D_MAP_ID", "")
+
 MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
 MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID") or os.getenv("MAP4D_MAP_ID", "")
 
 def render_map4d(df, api_key, map_id=""):
-    """
-    Hiển thị bản đồ Map4D sử dụng template map4d_template.html.
-    Template cần có các placeholder: ##MARKERS_PLACEHOLDER##, __API_KEY__, __MAP_ID__.
-    """
     template_path = os.path.join(os.path.dirname(__file__), "map4d_template.html")
     if not os.path.exists(template_path):
         st.error("❌ Không tìm thấy file map4d_template.html!")
@@ -36,7 +35,6 @@ def render_map4d(df, api_key, map_id=""):
     st.components.v1.html(html_content, height=800)
 
 def main():
-    # Chỉ gọi st.set_page_config nếu file được chạy độc lập
     if __name__ == "__main__":
         st.set_page_config(page_title="Bản đồ Cơ sở Ngân hàng", layout="wide")
     
@@ -49,23 +47,16 @@ def main():
         st.error(f"❌ Lỗi khi đọc file CSV: {e}")
         return
 
-    # Nếu cột 'name' trống, thay thế bằng bank_name + address
-    df['name'] = df.apply(
-        lambda row: f"{row['bank_name']} {row['address']}"
-                    if (pd.isna(row['name']) or str(row['name']).strip() == "")
-                    else row['name'],
-        axis=1
-    )
-
     st.write("### Dữ liệu gốc:")
-    st.dataframe(df.head(10))
+    st.dataframe(df)
 
-    # Bộ lọc theo city và bank
+    # Các bộ lọc được chuyển sang sidebar
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     bank_options = ['Tất cả'] + sorted(df['bank'].dropna().unique().tolist())
     
-    selected_city = st.selectbox("Chọn thành phố:", options=city_options, key="bank_city_filter")
-    selected_bank = st.selectbox("Chọn ngân hàng:", options=bank_options, key="bank_filter")
+    st.sidebar.header("Bộ lọc Ngân hàng")
+    selected_city = st.sidebar.selectbox("Chọn thành phố:", options=city_options, key="bank_city_filter")
+    selected_bank = st.sidebar.selectbox("Chọn ngân hàng:", options=bank_options, key="bank_filter")
     
     filtered_df = df.copy()
     if selected_city != "Tất cả":
@@ -76,10 +67,8 @@ def main():
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
     st.dataframe(filtered_df[['id', 'bank', 'bank_name', 'name', 'city', 'latitude', 'longitude']])
     
-    # Phân tích dữ liệu tọa độ
     with st.expander("Phân tích dữ liệu tọa độ"):
         total_rows = filtered_df.shape[0]
-        # Xác định các dòng có tọa độ không hợp lệ (NaN)
         missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
         missing_count = missing_coords.shape[0]
         valid_count = total_rows - missing_count
@@ -87,24 +76,48 @@ def main():
         st.write(f"Số dòng có tọa độ hợp lệ: {valid_count}")
         st.write(f"Số dòng thiếu tọa độ: {missing_count} ({(missing_count/total_rows*100):.2f}%)")
         
-        # Phân tích theo thành phố
         missing_by_city = missing_coords.groupby('city').size().reset_index(name='missing_count')
         st.write("Số dòng thiếu tọa độ theo thành phố:")
         st.dataframe(missing_by_city)
         
-        # Phân tích theo ngân hàng
         missing_by_bank = missing_coords.groupby('bank').size().reset_index(name='missing_count')
         st.write("Số dòng thiếu tọa độ theo ngân hàng:")
         st.dataframe(missing_by_bank)
     
-    # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
     
     if "map_visible_bank" not in st.session_state:
         st.session_state.map_visible_bank = False
-    if st.button("Hiển thị/Ẩn bản đồ Cơ sở Ngân hàng", key="toggle_map_bank"):
+    if st.sidebar.button("Hiển thị/Ẩn bản đồ Ngân hàng", key="toggle_map_bank"):
         st.session_state.map_visible_bank = not st.session_state.map_visible_bank
-    
+    st.sidebar.markdown("### Tuỳ chọn biểu đồ")
+    width = st.sidebar.slider("Chọn chiều rộng biểu đồ:", min_value=400, max_value=1200, value=800)
+    height = st.sidebar.slider("Chọn chiều cao biểu đồ:", min_value=300, max_value=800, value=400)
+    chart_option = st.sidebar.selectbox("Chọn biểu đồ:", options=["Cột chồng", "Tròn"], key="chart_option")
+    if chart_option == "Cột chồng":
+        st.markdown("### 📈 Biểu đồ cột chồng: Số lượng ATM và phòng giao dịch theo loại hình")
+        type_subtype_counts = filtered_df.groupby(['bank', 'type']).size().reset_index(name='count')
+        fig1 = px.bar(
+            type_subtype_counts, 
+            x='bank', 
+            y='count', 
+            color='type',
+            labels={'bank': 'Ngân hàng', 'count': 'Số lượng', 'type': 'Loại hình'},
+            title="Số lượng ATM và địa điểm giao dịch theo ngân hàng và loại hình",
+            barmode='stack'
+        )
+        fig1.update_layout(width=width, height=height, xaxis_title="Ngân hàng", yaxis_title="Số lượng")
+        st.plotly_chart(fig1)
+    elif chart_option == "Tròn":
+        st.markdown("### 🥧 Biểu đồ tròn: Tỉ lệ địa điểm giao dịch theo ngân hàng")
+        type_counts = df['bank'].value_counts()
+        fig2 = px.pie(
+            names=type_counts.index, 
+            values=type_counts.values, 
+            title="Tỉ lệ phần trăm ngân hàng"
+        )
+        fig2.update_layout(width=width, height=height)
+        st.plotly_chart(fig2)
     if st.session_state.map_visible_bank:
         if not MAP4D_API_KEY:
             st.warning("⚠️ Vui lòng cấu hình MAP4D_API_KEY trong phần Secrets của Streamlit")

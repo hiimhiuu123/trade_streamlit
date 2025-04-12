@@ -3,20 +3,17 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 
-# Cấu hình trang ngay từ đầu nếu chạy file độc lập
 if __name__ == "__main__":
     st.set_page_config(page_title="Bản đồ Khu công nghiệp", layout="wide")
 
-# Tải các biến môi trường từ file .env (cho phát triển cục bộ; khi deploy, cấu hình trực tiếp trên nền tảng)
 load_dotenv()
+# MAP4D_API_KEY = os.getenv("MAP4D_API_KEY")
+# MAP4D_MAP_ID = os.getenv("MAP4D_MAP_ID", "")
+
 MAP4D_API_KEY = st.secrets.get("MAP4D_API_KEY") or os.getenv("MAP4D_API_KEY")
 MAP4D_MAP_ID = st.secrets.get("MAP4D_MAP_ID") or os.getenv("MAP4D_MAP_ID", "")
 
 def render_map4d(df, api_key, map_id=""):
-    """
-    Hiển thị bản đồ Map4D sử dụng template map4d_template.html.
-    Template cần chứa các placeholder: ##MARKERS_PLACEHOLDER##, __API_KEY__, __MAP_ID__.
-    """
     template_path = os.path.join(os.path.dirname(__file__), "map4d_template.html")
     if not os.path.exists(template_path):
         st.error("❌ Không tìm thấy file map4d_template.html!")
@@ -33,14 +30,12 @@ def render_map4d(df, api_key, map_id=""):
         except Exception:
             continue
 
-        # Nếu một id có nhiều địa chỉ, vẫn vẽ marker với tên lấy từ cột 'name'
         marker_js += f"""
         new map4d.Marker({{
             position: {{ lat: {lat}, lng: {lng} }},
             title: "{row['name']}"
         }}).setMap(map);
         """
-
     html_content = (
         html_template
         .replace("##MARKERS_PLACEHOLDER##", marker_js)
@@ -52,7 +47,6 @@ def render_map4d(df, api_key, map_id=""):
 def main():
     st.title("🏭 Bản đồ Khu công nghiệp")
 
-    # Đọc file CSV chứa dữ liệu KCN
     file_path = os.path.join(os.path.dirname(__file__), "kcn.csv")
     try:
         df = pd.read_csv(file_path)
@@ -63,12 +57,12 @@ def main():
     st.write("### Dữ liệu gốc:")
     st.dataframe(df.head(10))
 
-    # Bộ lọc theo city và investor
     city_options = ['Tất cả'] + sorted(df['city'].dropna().unique().tolist())
     investor_options = ['Tất cả'] + sorted(df['investor'].dropna().unique().tolist())
 
-    selected_city = st.selectbox("Chọn thành phố:", options=city_options, key="industry_city_filter")
-    selected_investor = st.selectbox("Chọn investor:", options=investor_options, key="industry_investor_filter")
+    st.sidebar.header("Bộ lọc Khu công nghiệp")
+    selected_city = st.sidebar.selectbox("Chọn thành phố:", options=city_options, key="industry_city_filter")
+    selected_investor = st.sidebar.selectbox("Chọn investor:", options=investor_options, key="industry_investor_filter")
 
     filtered_df = df.copy()
     if selected_city != "Tất cả":
@@ -79,7 +73,6 @@ def main():
     st.write(f"### Dữ liệu đã lọc (số dòng: {filtered_df.shape[0]}):")
     st.dataframe(filtered_df[['id', 'name', 'investor', 'address', 'city', 'latitude', 'longitude']])
 
-    # Phân tích dữ liệu tọa độ
     with st.expander("Xem phân tích dữ liệu tọa độ"):
         total_rows = filtered_df.shape[0]
         missing_coords = filtered_df[filtered_df['latitude'].isna() | filtered_df['longitude'].isna()]
@@ -89,24 +82,21 @@ def main():
         st.write(f"Số KCN có tọa độ hợp lệ: {valid_count}")
         st.write(f"Số KCN thiếu tọa độ: {missing_count} ({(missing_count/total_rows*100):.2f}%)")
 
-        # Thống kê theo thành phố
         if 'city' in filtered_df.columns:
             missing_by_city = missing_coords.groupby('city').size().reset_index(name='Số lượng thiếu tọa độ')
             st.write("Số KCN thiếu tọa độ theo thành phố:")
             st.dataframe(missing_by_city)
 
-        # Thống kê theo investor
         if 'investor' in filtered_df.columns:
             missing_by_investor = missing_coords.groupby('investor').size().reset_index(name='Số lượng thiếu tọa độ')
             st.write("Số KCN thiếu tọa độ theo investor:")
             st.dataframe(missing_by_investor)
 
-    # Khi hiển thị bản đồ, chỉ sử dụng các dòng có tọa độ hợp lệ
     map_df = filtered_df.dropna(subset=["latitude", "longitude"])
 
     if "map_visible_industry" not in st.session_state:
         st.session_state.map_visible_industry = False
-    if st.button("Hiển thị/Ẩn bản đồ KCN", key="toggle_map_industry"):
+    if st.sidebar.button("Hiển thị/Ẩn bản đồ KCN", key="toggle_map_industry"):
         st.session_state.map_visible_industry = not st.session_state.map_visible_industry
 
     if st.session_state.map_visible_industry:
